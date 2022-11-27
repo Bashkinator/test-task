@@ -1,5 +1,14 @@
+import sys
 import argparse
+import logging
+import os.path
 import uuid
+
+logger = logging.getLogger('test-task')
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(stream=sys.stdout)
+handler.setFormatter(logging.Formatter(fmt='[%(asctime)s: %(levelname)s] %(message)s'))
+logger.addHandler(handler)
 
 
 class RandomGenerator:
@@ -48,16 +57,28 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('-s', '--source-dir', action='store', default='./out')
     parser.add_argument('-o', '--output-dir', action='store', default='./out')
 
+    parser.add_argument('-v', '--verbose', action='store_true')
+
     return parser
 
 
 def main() -> None:
     parser = init_argparse()
     args = parser.parse_args()
+
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+
     if args.parse:
+        src_dir = os.path.abspath(args.source_dir)
+        logger.info(f"Parsing zip-files from {src_dir}")
         pass  # do parsing
+        logger.info(f"Zip-files are parsed, csv-files are created in {src_dir}")
     else:  # creating is default option
+        out_dir = os.path.abspath(args.output_dir)
+        logger.info(f"Creating {args.zip_count} zip-files with {args.xml_count} xml-files in each")
         pass  # do creating
+        logger.info(f"{args.zip_count} zip-files with {args.xml_count} xml-files in each are created in {out_dir}")
 
 
 if __name__ == "__main__":
