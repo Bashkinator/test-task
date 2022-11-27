@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os.path
+import pathlib
 import random
 import sys
 import uuid
@@ -81,6 +82,14 @@ class RandomGenerator:
         return cls.unique_strings_generated - old_strings  # Returns only new strings
 
 
+def create_files(zip_count, xml_count, out_dir):
+    pass
+
+
+def parse_files(src_dir, out_dir):
+    pass
+
+
 def init_argparse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Create zip archives with xml files or parse directory with zip-archives and create csv files "
@@ -110,13 +119,17 @@ def main() -> None:
 
     if args.parse:
         src_dir = os.path.abspath(args.source_dir)
+        pathlib.Path(src_dir).mkdir(parents=True, exist_ok=True)
+        out_dir = os.path.abspath(args.output_dir)
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
         logger.info(f"Parsing zip-files from {src_dir}")
-        pass  # do parsing
-        logger.info(f"Zip-files are parsed, csv-files are created in {src_dir}")
+        parse_files(src_dir, out_dir)  # do parsing
+        logger.info(f"Zip-files are parsed, csv-files are created in {out_dir}")
     else:  # creating is default option
         out_dir = os.path.abspath(args.output_dir)
+        pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
         logger.info(f"Creating {args.zip_count} zip-files with {args.xml_count} xml-files in each")
-        pass  # do creating
+        create_files(args.zip_count, args.xml_count, out_dir)  # do creating
         logger.info(f"{args.zip_count} zip-files with {args.xml_count} xml-files in each are created in {out_dir}")
 
 
