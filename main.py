@@ -1,14 +1,52 @@
-import sys
 import argparse
 import logging
 import os.path
+import random
+import sys
 import uuid
+
+from lxml import etree
 
 logger = logging.getLogger('test-task')
 logger.setLevel(logging.INFO)
 handler = logging.StreamHandler(stream=sys.stdout)
 handler.setFormatter(logging.Formatter(fmt='[%(asctime)s: %(levelname)s] %(message)s'))
 logger.addHandler(handler)
+
+
+class TestObject:
+
+    def __init__(self, object_id=None, level=None, object_names=None):
+        self.object_id = object_id if object_id else RandomGenerator.get_unique_random_string()
+        self.level = level if level else random.randint(1, 100)
+        if object_names is not None:
+            self.object_names = object_names
+        else:
+            self.object_names = [
+                RandomGenerator.get_random_string()
+                for _ in range(random.randint(1, 10))
+            ]
+
+    @classmethod
+    def from_xml_string(cls, xml_string):
+        xml_root = etree.XML(xml_string)
+        object_id = xml_root[0].get("value")
+        level = xml_root[1].get("value")
+        xml_objects = xml_root[2]
+        object_names = []
+        for xml_obj in xml_objects.iter("object"):
+            object_names.append(xml_obj.get("name"))
+        return cls(object_id=object_id, level=level, object_names=object_names)
+
+    def serialize(self):
+        root = etree.Element("root")
+        etree.SubElement(root, "var", attrib={"name": "id", "value": self.object_id})
+        etree.SubElement(root, "var", attrib={"name": "level", "value": str(self.level)})
+        objects = etree.SubElement(root, "objects")
+        for name in self.object_names:
+            etree.SubElement(objects, "object", attrib={"name": name})
+        tree = etree.ElementTree(root)
+        return tree
 
 
 class RandomGenerator:
