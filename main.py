@@ -113,7 +113,7 @@ def create_zipfile(name, object_ids, out_dir):
     zip_buffer = io.BytesIO()
     lock = threading.Lock()
     with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        with ThreadPoolExecutor(10) as exe:
+        with ThreadPoolExecutor() as exe:
             futures = [exe.submit(create_testfile, object_id, zf, lock) for object_id in object_ids]
             for future in as_completed(futures):
                 _ = future.result()
@@ -123,10 +123,10 @@ def create_zipfile(name, object_ids, out_dir):
     return [name, out_dir, object_ids]
 
 
-def create_files(zip_count, xml_count, out_dir, worker_count):
+def create_files(zip_count, xml_count, out_dir):
     all_object_ids = RandomGenerator.get_unique_random_strings(zip_count * xml_count)
     object_ids_iter = iter(all_object_ids)
-    with ProcessPoolExecutor(worker_count) as exe:
+    with ProcessPoolExecutor() as exe:
         futures = list()
         for i in range(0, zip_count):
             objects_ids = list(itertools.islice(object_ids_iter, xml_count))  # get chunk of names from set iterator
@@ -162,7 +162,7 @@ def extract_test_objects(zip_path):
     with zipfile.ZipFile(zip_path, 'r') as zf:
         xml_files = [zf.read(name) for name in zf.namelist()]
     test_objects = list()
-    with ThreadPoolExecutor(10) as exe:
+    with ThreadPoolExecutor() as exe:
         futures = list()
         for xml in xml_files:
             futures.append(exe.submit(TestObject.from_xml_string, xml))
@@ -171,17 +171,17 @@ def extract_test_objects(zip_path):
     return test_objects
 
 
-def parse_files(src_dir, out_dir, worker_count):
+def parse_files(src_dir, out_dir):
     test_objects = list()
     filepaths = [os.path.join(src_dir, f) for f in os.listdir(src_dir) if os.path.isfile(os.path.join(src_dir, f)) and f.endswith('.zip') ]
-    with ProcessPoolExecutor(worker_count) as exe:
+    with ProcessPoolExecutor() as exe:
         futures = list()
         for filepath in filepaths:
             futures.append(exe.submit(extract_test_objects, filepath))
         for future in as_completed(futures):
             res = future.result()
             test_objects.extend(res)
-            # get_logger().debug(res)
+            get_logger().debug(res)
         csv_futures = list()
         csv_futures.append(exe.submit(create_levels_file, test_objects, out_dir))
         csv_futures.append(exe.submit(create_names_file, test_objects, out_dir))
@@ -204,8 +204,6 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('-s', '--source-dir', action='store', default='./out')
     parser.add_argument('-o', '--output-dir', action='store', default='./out')
 
-    parser.add_argument("-w", "--worker-count", action='store', type=int, default=4)
-
     parser.add_argument('-v', '--verbose', action='store_true')
 
     return parser
@@ -222,13 +220,13 @@ def main() -> None:
         out_dir = os.path.abspath(args.output_dir)
         pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
         logger.info(f"Parsing zip-files from {src_dir}")
-        parse_files(src_dir, out_dir, args.worker_count)  # do parsing
+        parse_files(src_dir, out_dir)  # do parsing
         logger.info(f"Zip-files are parsed, csv-files are created in {out_dir}")
     else:  # creating is default option
         out_dir = os.path.abspath(args.output_dir)
         pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
         logger.info(f"Creating {args.zip_count} zip-files with {args.xml_count} xml-files in each")
-        create_files(args.zip_count, args.xml_count, out_dir, args.worker_count)  # do creating
+        create_files(args.zip_count, args.xml_count, out_dir)  # do creating
         logger.info(f"{args.zip_count} zip-files with {args.xml_count} xml-files in each are created in {out_dir}")
 
 
