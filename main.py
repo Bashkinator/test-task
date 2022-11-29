@@ -1,4 +1,5 @@
 import argparse
+import csv
 import io
 import itertools
 import logging
@@ -40,6 +41,12 @@ class TestObject:
                 RandomGenerator.get_random_string()
                 for _ in range(random.randint(1, 10))
             ]
+
+    def __str__(self):
+        return f"TestObject ID={self.object_id} level={self.level}, objects={self.object_names}"
+
+    def __repr__(self):
+        return str(self)
 
     @classmethod
     def from_xml_string(cls, xml_string):
@@ -129,8 +136,57 @@ def create_files(zip_count, xml_count, out_dir, worker_count):
             get_logger().debug(res)
 
 
-def parse_files(src_dir, out_dir):
-    pass
+def create_levels_file(test_objects, out_dir):
+    filename = os.path.join(out_dir, "levels.csv")
+    with open(filename, 'w', newline='') as csvfile:
+        levels_writer = csv.writer(csvfile)
+        for test_object in test_objects:
+            levels_writer.writerow([test_object.object_id, test_object.level])
+
+
+def create_names_file(test_objects, out_dir):
+    filename = os.path.join(out_dir, "names.csv")
+    with open(filename, 'w', newline='') as csvfile:
+        names_writer = csv.writer(csvfile)
+        for test_object in test_objects:
+            for name in test_object.object_names:
+                names_writer.writerow([test_object.object_id, name])
+
+
+def process_test_object(xml_string):
+    test_object = TestObject.from_xml_string(xml_string)
+    return test_object
+
+
+def extract_test_objects(zip_path):
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        xml_files = [zf.read(name) for name in zf.namelist()]
+    test_objects = list()
+    with ThreadPoolExecutor(10) as exe:
+        futures = list()
+        for xml in xml_files:
+            futures.append(exe.submit(TestObject.from_xml_string, xml))
+        for future in as_completed(futures):
+            test_objects.append(future.result())
+    return test_objects
+
+
+def parse_files(src_dir, out_dir, worker_count):
+    test_objects = list()
+    filepaths = [os.path.join(src_dir, f) for f in os.listdir(src_dir) if os.path.isfile(os.path.join(src_dir, f)) and f.endswith('.zip') ]
+    with ProcessPoolExecutor(worker_count) as exe:
+        futures = list()
+        for filepath in filepaths:
+            futures.append(exe.submit(extract_test_objects, filepath))
+        for future in as_completed(futures):
+            res = future.result()
+            test_objects.extend(res)
+            # get_logger().debug(res)
+        csv_futures = list()
+        csv_futures.append(exe.submit(create_levels_file, test_objects, out_dir))
+        csv_futures.append(exe.submit(create_names_file, test_objects, out_dir))
+        for future in as_completed(csv_futures):
+            _ = future.result()
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -163,11 +219,10 @@ def main() -> None:
 
     if args.parse:
         src_dir = os.path.abspath(args.source_dir)
-        pathlib.Path(src_dir).mkdir(parents=True, exist_ok=True)
         out_dir = os.path.abspath(args.output_dir)
         pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
         logger.info(f"Parsing zip-files from {src_dir}")
-        parse_files(src_dir, out_dir)  # do parsing
+        parse_files(src_dir, out_dir, args.worker_count)  # do parsing
         logger.info(f"Zip-files are parsed, csv-files are created in {out_dir}")
     else:  # creating is default option
         out_dir = os.path.abspath(args.output_dir)
