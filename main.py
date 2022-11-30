@@ -12,7 +12,7 @@ import uuid
 import zipfile
 from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
 
-from lxml import etree
+from xml.etree import ElementTree
 
 
 def init_logger(level=logging.INFO):
@@ -50,7 +50,7 @@ class TestObject:
 
     @classmethod
     def from_xml_string(cls, xml_string):
-        xml_root = etree.XML(xml_string)
+        xml_root = ElementTree.fromstring(xml_string)
         object_id = xml_root[0].get("value")
         level = xml_root[1].get("value")
         xml_objects = xml_root[2]
@@ -60,14 +60,13 @@ class TestObject:
         return cls(object_id=object_id, level=level, object_names=object_names)
 
     def serialize(self):
-        root = etree.Element("root")
-        etree.SubElement(root, "var", attrib={"name": "id", "value": self.object_id})
-        etree.SubElement(root, "var", attrib={"name": "level", "value": str(self.level)})
-        objects = etree.SubElement(root, "objects")
+        root = ElementTree.Element("root")
+        ElementTree.SubElement(root, "var", attrib={"name": "id", "value": self.object_id})
+        ElementTree.SubElement(root, "var", attrib={"name": "level", "value": str(self.level)})
+        objects = ElementTree.SubElement(root, "objects")
         for name in self.object_names:
-            etree.SubElement(objects, "object", attrib={"name": name})
-        tree = etree.ElementTree(root)
-        return tree
+            ElementTree.SubElement(objects, "object", attrib={"name": name})
+        return ElementTree.tostring(root, xml_declaration=True)
 
 
 class RandomGenerator:
@@ -102,10 +101,9 @@ class RandomGenerator:
 
 
 def create_testfile(object_id, file, lock):
-    obj_tree = TestObject(object_id).serialize()
-    obj_str = etree.tostring(obj_tree, xml_declaration=True)
+    obj_xml_str = TestObject(object_id).serialize()
     with lock:
-        file.writestr(f"{object_id}.xml", obj_str)
+        file.writestr(f"{object_id}.xml", obj_xml_str)
     return object_id
 
 
